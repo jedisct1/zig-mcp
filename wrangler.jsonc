@@ -1,0 +1,47 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "zig-docs-mcp",
+    "main": "mcp.ts",
+    "compatibility_date": "2025-06-04",
+    "compatibility_flags": [
+        "nodejs_compat"
+    ],
+    "routes": [
+        {
+            "pattern": "mcp.zigwasm.org/*",
+            "zone_name": "zigwasm.org"
+        }
+    ],
+    "migrations": [
+        {
+            "new_sqlite_classes": [
+                "ZigDocsMcp"
+            ],
+            "tag": "v1"
+        }
+    ],
+    "durable_objects": {
+        "bindings": [
+            {
+                "class_name": "ZigDocsMcp",
+                "name": "MCP_OBJECT"
+            }
+        ]
+    },
+    "assets": {
+        "directory": "./data",
+        "binding": "ASSETS"
+    },
+    "observability": {
+        "enabled": true
+    },
+    "rules": [
+        {
+            "type": "CompiledWasm",
+            "globs": [
+                "*.wasm"
+            ],
+            "fallthrough": true
+        }
+    ]
+}
