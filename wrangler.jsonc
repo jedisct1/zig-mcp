@@ -8,8 +8,8 @@
     ],
     "routes": [
         {
-            "pattern": "mcp.zigwasm.org/*",
-            "zone_name": "zigwasm.org"
+            "pattern": "mcp.zigwasm.org",
+            "custom_domain": true
         }
     ],
     "migrations": [
