@@ -20,7 +20,7 @@ export class ZigDocsMcp extends McpAgent<Env> {
     server = new McpServer({
         name: "ZigDocs",
         description: "Retrieves up-to-date documentation and code examples for Zig programming language standard library.",
-        version: process.env.ZIG_VERSION!,
+        version: process.env.ZIG_VERSION || "0.15.0",
     });
     builtinFunctions: BuiltinFunction[] = [];
     stdApi: StdApi | null = null;
