@@ -1,7 +1,28 @@
 {
     "name": "zig-docs-mcp",
-    "author": "Andrey Ryapov <afirium@crappy.systems> (https://crappy.systems/)",
+    "version": "1.0.0",
+    "description": "MCP server that provides up-to-date documentation for the Zig programming language standard library and builtin functions",
+    "author": "Andrey Ryapov <afirium@crappy.systems> (https://zigwasm.org/)",
+    "license": "MIT",
+    "type": "module",
+    "bin": {
+        "zig-docs-mcp": "./dist/local.js"
+    },
+    "files": [
+        "dist/",
+        "data/",
+        "main.wasm",
+        "get-zig-docs.ts",
+        "README.md"
+    ],
     "scripts": {
+        "build": "tsc",
+        "prepublishOnly": "npm run build",
+        "get-docs": "node --experimental-transform-types get-zig-docs.ts",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:ui": "vitest --ui",
+        "test:coverage": "vitest run --coverage",
         "deploy": "wrangler deploy",
         "dev": "wrangler dev",
         "format": "biome format --write",
@@ -19,7 +40,29 @@
     "devDependencies": {
         "@biomejs/biome": "^1.9.4",
         "@types/node": "^24.0.3",
+        "@vitest/ui": "^3.2.4",
         "typescript": "^5.8.3",
+        "vitest": "^3.2.4",
         "wrangler": "^4.20.0"
-    }
+    },
+    "keywords": [
+        "mcp",
+        "modelcontextprotocol",
+        "zig",
+        "ziglang",
+        "zig-docs",
+        "cli"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/zig-wasm/zig-docs-mcp.git"
+    },
+    "bugs": {
+        "url": "https://github.com/zig-wasm/zig-docs-mcp/issues"
+    },
+    "homepage": "https://github.com/zig-wasm/zig-docs-mcp#readme",
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "private": false
 }
