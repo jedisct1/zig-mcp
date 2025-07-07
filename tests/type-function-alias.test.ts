@@ -63,7 +63,7 @@ describe("Type Function Alias Resolution", () => {
         expect(response.result.content[0].text).toContain("ArrayListAligned");
     });
 
-    it("should list members of std.array_list.ArrayList (this currently fails)", async () => {
+    it("should list members of std.array_list.ArrayList (fixed with alias resolution)", async () => {
         const response = await transport.sendRequest({
             jsonrpc: "2.0",
             id: 2,
@@ -78,12 +78,10 @@ describe("Type Function Alias Resolution", () => {
 
         console.log("ArrayList members:", response.result?.content?.[0]?.text);
 
-        // This currently fails - let's see what we get
-        if (response.result.content[0].text.includes("No members found")) {
-            console.log("❌ ArrayList member listing is currently broken (as expected)");
-        } else {
-            console.log("✅ ArrayList member listing works!");
-        }
+        expect(response.error).toBeUndefined();
+        expect(response.result.content[0].text).not.toContain("No members found");
+        expect(response.result.content[0].text).toContain("ArrayList");
+        console.log("✅ ArrayList member listing works!");
     });
 
     it("should get documentation for ArrayList (this should work after our previous fix)", async () => {

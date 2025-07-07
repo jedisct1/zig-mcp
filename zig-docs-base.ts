@@ -308,29 +308,77 @@ export abstract class ZigDocsBase {
             return unwrapSlice32(wasmExports.namespace_members(decl_index, include_private));
         }
         function listMembers(fqn: string): Array<{ name: string; kind: string; briefDoc: string }> {
-            const triedFqns: string[] = [];
-            let fqnToUse: string;
-            if (fqn === "" || fqn === "root" || fqn === "std") {
-                fqnToUse = "root";
-                triedFqns.push(fqnToUse);
-            } else if (!fqn.startsWith("root.") && !fqn.startsWith("std.")) {
-                triedFqns.push(`root.${fqn}`);
-                triedFqns.push(`std.${fqn}`);
-                triedFqns.push(fqn);
-                fqnToUse = `root.${fqn}`;
-            } else if (fqn.startsWith("std.")) {
-                triedFqns.push(fqn.replace(/^std\./, "root."));
-                triedFqns.push(fqn);
-                fqnToUse = fqn.replace(/^std\./, "root.");
-            } else {
-                fqnToUse = fqn;
-                triedFqns.push(fqnToUse);
-            }
             let decl_index: number | null = null;
-            for (const candidate of triedFqns) {
-                decl_index = findDecl(candidate);
-                if (decl_index !== null) break;
+            
+            // Handle root/std namespace specially to show the std aliases
+            if (fqn === "" || fqn === "root" || fqn === "std") {
+                // Instead of using find_module_root(0) which returns the Target module,
+                // we want to show the std.* aliases like std.ArrayList, std.HashMap, etc.
+                // These aliases exist but are not contained in a listable namespace.
+                // We'll use search to find all std.* items and present them as the std namespace
+                const ignoreCase = false;
+                const results = executeQuery("std.", ignoreCase);
+                
+                // Filter to only direct std.* items (not std.*.* items)
+                const stdItems: Array<{ name: string; kind: string; briefDoc: string }> = [];
+                const seenNames = new Set<string>();
+                
+                for (const result_index of Array.from(results)) {
+                    const fullName = fullyQualifiedName(result_index);
+                    
+                    // Only include direct std.* items (like std.ArrayList, std.HashMap)
+                    // Skip deeper nested items (like std.array_list.ArrayList)
+                    if (fullName.startsWith("root.std.")) {
+                        const stdName = fullName.replace(/^root\./, "");
+                        const parts = stdName.split('.');
+                        
+                        // Only include direct children of std (std.Something, not std.Something.SomethingElse)
+                        if (parts.length === 2 && !seenNames.has(stdName)) {
+                            seenNames.add(stdName);
+                            
+                            let real_index = result_index;
+                            let kind = kindString(categorizeDecl(real_index));
+                            
+                            // Follow alias chain
+                            while (kind === "alias") {
+                                wasmExports.categorize_decl(real_index, 0);
+                                real_index = Number(wasmExports.get_aliasee());
+                                kind = kindString(categorizeDecl(real_index));
+                            }
+                            
+                            const briefDoc = declDocsHtmlShort(real_index)
+                                .replace(/<[^>]+>/g, "")
+                                .replace(/\s+/g, " ")
+                                .trim();
+                            
+                            stdItems.push({ name: stdName, kind, briefDoc });
+                        }
+                    }
+                }
+                
+                // Sort by name for consistent output
+                stdItems.sort((a, b) => a.name.localeCompare(b.name));
+                return stdItems;
+            } else {
+                // For other namespaces, try different FQN patterns
+                const triedFqns: string[] = [];
+                if (!fqn.startsWith("root.") && !fqn.startsWith("std.")) {
+                    triedFqns.push(`root.${fqn}`);
+                    triedFqns.push(`std.${fqn}`);
+                    triedFqns.push(fqn);
+                } else if (fqn.startsWith("std.")) {
+                    triedFqns.push(fqn.replace(/^std\./, "root."));
+                    triedFqns.push(fqn);
+                } else {
+                    triedFqns.push(fqn);
+                }
+                
+                for (const candidate of triedFqns) {
+                    decl_index = findDecl(candidate);
+                    if (decl_index !== null) break;
+                }
             }
+            
             if (decl_index === null) return [];
             
             // Use the proper WASM function based on declaration type
@@ -346,12 +394,19 @@ export abstract class ZigDocsBase {
             }
             return members.map((member_index: number) => {
                 let real_index: number = member_index;
+                const original_index = member_index;
                 let kind = kindString(categorizeDecl(real_index));
+                
+                // Follow the alias chain like the original JS does
                 while (kind === "alias") {
+                    // Call get_aliasee() after categorizing the current member
+                    wasmExports.categorize_decl(real_index, 0);
                     real_index = Number(wasmExports.get_aliasee());
                     kind = kindString(categorizeDecl(real_index));
                 }
-                const name = fullyQualifiedName(real_index);
+                
+                // Use the original index for the name to preserve alias names in the output
+                const name = fullyQualifiedName(original_index);
                 const briefDoc = declDocsHtmlShort(real_index)
                     .replace(/<[^>]+>/g, "")
                     .replace(/\s+/g, " ")
@@ -360,36 +415,47 @@ export abstract class ZigDocsBase {
             });
         }
         function resolveFqnAndKind(fqn: string): { resolvedFqn: string; kind: string } {
-            const triedFqns: string[] = [];
-            let fqnToUse: string;
-            if (fqn === "" || fqn === "root" || fqn === "std") {
-                fqnToUse = "root";
-                triedFqns.push(fqnToUse);
-            } else if (!fqn.startsWith("root.") && !fqn.startsWith("std.")) {
-                triedFqns.push(`root.${fqn}`);
-                triedFqns.push(`std.${fqn}`);
-                triedFqns.push(fqn);
-                fqnToUse = `root.${fqn}`;
-            } else if (fqn.startsWith("std.")) {
-                triedFqns.push(fqn.replace(/^std\./, "root."));
-                triedFqns.push(fqn);
-                fqnToUse = fqn.replace(/^std\./, "root.");
-            } else {
-                fqnToUse = fqn;
-                triedFqns.push(fqnToUse);
-            }
             let decl_index: number | null = null;
-            let resolvedFqn: string = fqnToUse;
-            for (const candidate of triedFqns) {
-                decl_index = findDecl(candidate);
-                if (decl_index !== null) {
-                    resolvedFqn = candidate;
-                    break;
+            let resolvedFqn: string = fqn;
+            
+            // Handle root/std namespace specially - it's a virtual namespace containing aliases
+            if (fqn === "" || fqn === "root" || fqn === "std") {
+                // The std namespace is virtual - it's not a real declaration but contains aliases
+                resolvedFqn = "std";
+                return { resolvedFqn, kind: "namespace" };
+            } else {
+                // For other namespaces, try different FQN patterns
+                const triedFqns: string[] = [];
+                if (!fqn.startsWith("root.") && !fqn.startsWith("std.")) {
+                    triedFqns.push(`root.${fqn}`);
+                    triedFqns.push(`std.${fqn}`);
+                    triedFqns.push(fqn);
+                } else if (fqn.startsWith("std.")) {
+                    triedFqns.push(fqn.replace(/^std\./, "root."));
+                    triedFqns.push(fqn);
+                } else {
+                    triedFqns.push(fqn);
+                }
+                
+                for (const candidate of triedFqns) {
+                    decl_index = findDecl(candidate);
+                    if (decl_index !== null) {
+                        resolvedFqn = candidate;
+                        break;
+                    }
                 }
             }
             let kind = "unknown";
             if (decl_index !== null) {
-                kind = kindString(categorizeDecl(decl_index));
+                let real_index = decl_index;
+                kind = kindString(categorizeDecl(real_index));
+                
+                // Follow alias chain like the original JS
+                while (kind === "alias") {
+                    wasmExports.categorize_decl(real_index, 0);
+                    real_index = Number(wasmExports.get_aliasee());
+                    kind = kindString(categorizeDecl(real_index));
+                }
             }
             return { resolvedFqn: resolvedFqn.replace(/^root\./, "std."), kind };
         }
@@ -401,50 +467,48 @@ export abstract class ZigDocsBase {
                 });
             }
 
-            // Build comprehensive candidate list
-            const triedFqns: string[] = [];
-            let fqnToUse: string;
-            
-            if (fqn === "" || fqn === "root" || fqn === "std") {
-                fqnToUse = "root";
-                triedFqns.push(fqnToUse);
-            } else if (!fqn.startsWith("root.") && !fqn.startsWith("std.")) {
-                triedFqns.push(`root.${fqn}`);
-                triedFqns.push(`std.${fqn}`);
-                triedFqns.push(fqn);
-                fqnToUse = `root.${fqn}`;
-            } else if (fqn.startsWith("std.")) {
-                triedFqns.push(fqn.replace(/^std\./, "root."));
-                triedFqns.push(fqn);
-                fqnToUse = fqn.replace(/^std\./, "root.");
-                
-                // Add common stdlib alias patterns for items like std.ArrayList -> std.array_list.ArrayList
-                const parts = fqn.split('.');
-                if (parts.length === 2 && parts[0] === 'std') {
-                    const itemName = parts[1];
-                    const snakeCaseName = toSnakeCase(itemName);
-                    
-                    // Try common patterns:
-                    // std.ArrayList -> std.array_list.ArrayList
-                    // std.HashMap -> std.hash_map.HashMap
-                    if (snakeCaseName !== itemName.toLowerCase()) {
-                        triedFqns.push(`root.${snakeCaseName}.${itemName}`);
-                        triedFqns.push(`std.${snakeCaseName}.${itemName}`);
-                    }
-                }
-            } else {
-                fqnToUse = fqn;
-                triedFqns.push(fqnToUse);
-            }
-            
-            // Try to find declaration with all candidates
             let decl_index: number | null = null;
-            let found_candidate = "";
-            for (const candidate of triedFqns) {
-                decl_index = findDecl(candidate);
-                if (decl_index !== null) {
-                    found_candidate = candidate;
-                    break;
+            
+            // Handle root/std namespace specially like the original website
+            if (fqn === "" || fqn === "root" || fqn === "std") {
+                // Use find_module_root(0) to get the actual root module like the original website
+                decl_index = wasmExports.find_module_root(0);
+            } else {
+                // Build comprehensive candidate list for non-root items
+                const triedFqns: string[] = [];
+                
+                if (!fqn.startsWith("root.") && !fqn.startsWith("std.")) {
+                    triedFqns.push(`root.${fqn}`);
+                    triedFqns.push(`std.${fqn}`);
+                    triedFqns.push(fqn);
+                } else if (fqn.startsWith("std.")) {
+                    triedFqns.push(fqn.replace(/^std\./, "root."));
+                    triedFqns.push(fqn);
+                    
+                    // Add common stdlib alias patterns for items like std.ArrayList -> std.array_list.ArrayList
+                    const parts = fqn.split('.');
+                    if (parts.length === 2 && parts[0] === 'std') {
+                        const itemName = parts[1];
+                        const snakeCaseName = toSnakeCase(itemName);
+                        
+                        // Try common patterns:
+                        // std.ArrayList -> std.array_list.ArrayList
+                        // std.HashMap -> std.hash_map.HashMap
+                        if (snakeCaseName !== itemName.toLowerCase()) {
+                            triedFqns.push(`root.${snakeCaseName}.${itemName}`);
+                            triedFqns.push(`std.${snakeCaseName}.${itemName}`);
+                        }
+                    }
+                } else {
+                    triedFqns.push(fqn);
+                }
+                
+                // Try to find declaration with all candidates
+                for (const candidate of triedFqns) {
+                    decl_index = findDecl(candidate);
+                    if (decl_index !== null) {
+                        break;
+                    }
                 }
             }
 
@@ -463,20 +527,39 @@ export abstract class ZigDocsBase {
                     const candidate = `root.${submodule}.${itemName}`;
                     decl_index = findDecl(candidate);
                     if (decl_index !== null) {
-                        found_candidate = candidate;
                         break;
                     }
                 }
             }
             
             if (decl_index === null) return null;
+            
+            // Follow alias chain like the original JS to get the final implementation
             let real_index: number = decl_index;
             let kind = kindString(categorizeDecl(real_index));
+            const original_fqn = fullyQualifiedName(decl_index);
+            
             while (kind === "alias") {
+                // Call categorize_decl to set up the aliasee context
+                wasmExports.categorize_decl(real_index, 0);
                 real_index = Number(wasmExports.get_aliasee());
                 kind = kindString(categorizeDecl(real_index));
             }
-            const name = fullyQualifiedName(real_index).replace(/^root\./, "std.");
+            
+            // Use the resolved name but show it as the original requested name for consistency
+            const resolved_name = fullyQualifiedName(real_index).replace(/^root\./, "std.");
+            // For the title, prefer the original requested name if it was a std.* alias
+            let display_name = resolved_name;
+            
+            // Check if the user requested a simple std.* name and we found it via the alias search
+            if (fqn.startsWith("std.") && fqn.split('.').length === 2) {
+                // User requested something like "std.ArrayList", use that as the display name
+                display_name = fqn;
+            } else if (original_fqn.startsWith("root.std.") && original_fqn.split('.').length === 3) {
+                // Handle direct root.std.* lookups
+                display_name = original_fqn.replace(/^root\./, "");
+            }
+            
             const doc = unwrapString(wasmExports.decl_docs_html(real_index, false))
                 .replace(/<[^>]+>/g, "")
                 .replace(/\s+/g, " ")
@@ -547,15 +630,18 @@ export abstract class ZigDocsBase {
                     sourceMd = `\n**Source code:**\n\`\`\`zig\n${source.replace(/<[^>]+>/g, "").trim()}\n\`\`\``;
                 }
             }
-            let markdown = `### ${name} (${kind})\n`;
+            let markdown = `### ${display_name} (${kind})\n`;
             if (signature) markdown += `\n\`\`\`zig\n${signature}\n\`\`\`\n`;
             if (doc) markdown += `\n${doc}\n`;
             if (paramsMd) markdown += `\n${paramsMd}\n`;
             if (errorsMd) markdown += `\n${errorsMd}\n`;
             if (exampleMd) markdown += `\n${exampleMd}\n`;
             if (sourceMd) markdown += `\n${sourceMd}\n`;
-            if (kind === "namespace" || kind === "container") {
-                const members = namespaceMembers(real_index, false);
+            if (kind === "namespace" || kind === "container" || kind === "type_function") {
+                // For type functions, use type_fn_members, otherwise use namespace_members
+                const members = (kind === "type_function") 
+                    ? unwrapSlice32(wasmExports.type_fn_members(real_index, false))
+                    : namespaceMembers(real_index, false);
                 const types: { idx: number; real: number }[] = [];
                 const namespaces: { idx: number; real: number }[] = [];
                 const functions: { idx: number; real: number }[] = [];
@@ -564,6 +650,8 @@ export abstract class ZigDocsBase {
                     let real = member_index;
                     let memberKind = kindString(categorizeDecl(real));
                     while (memberKind === "alias") {
+                        // Call categorize_decl to set up the aliasee context
+                        wasmExports.categorize_decl(real, 0);
                         real = Number(wasmExports.get_aliasee());
                         memberKind = kindString(categorizeDecl(real));
                     }
