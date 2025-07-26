@@ -37,7 +37,7 @@ export async function ensureDocs(
     if (shouldUpdate) {
         try {
             if (!isMcpMode) console.log(`Updating documentation for Zig version: ${zigVersion}`);
-            const builtinFunctions = await extractBuiltinFunctions(zigVersion, isMcpMode);
+            const builtinFunctions = await extractBuiltinFunctions(zigVersion, isMcpMode, true);
 
             await downloadSourcesTar(zigVersion, isMcpMode, true);
 

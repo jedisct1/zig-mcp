@@ -12,12 +12,13 @@ export interface BuiltinFunction {
 async function extractBuiltinFunctions(
     zigVersion: string,
     isMcpMode = true,
+    forceUpdate = false,
 ): Promise<BuiltinFunction[]> {
     const paths = envPaths("zig-mcp", { suffix: "" });
     const versionCacheDir = path.join(paths.cache, zigVersion);
     const outputPath = path.join(versionCacheDir, "builtin-functions.json");
 
-    if (fs.existsSync(outputPath)) {
+    if (fs.existsSync(outputPath) && !forceUpdate) {
         if (!isMcpMode) console.log(`Using cached builtin functions from ${outputPath}`);
         try {
             const content = fs.readFileSync(outputPath, "utf8");
