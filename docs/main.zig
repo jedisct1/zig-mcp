@@ -683,7 +683,6 @@ fn render_docs(
     var parsed_doc = try parser.endInput();
     defer parsed_doc.deinit(gpa);
 
-
     const Writer = std.ArrayListUnmanaged(u8).Writer;
     const Renderer = markdown.Renderer(Writer, Decl.Index);
     const renderer: Renderer = .{
@@ -752,10 +751,10 @@ export fn decl_type_html(decl_index: Decl.Index) String {
 const Oom = error{OutOfMemory};
 
 fn unpackInner(tar_bytes: []u8) !void {
-    var fbs = std.io.fixedBufferStream(tar_bytes);
+    var reader: std.Io.Reader = .fixed(tar_bytes);
     var file_name_buffer: [1024]u8 = undefined;
     var link_name_buffer: [1024]u8 = undefined;
-    var it = std.tar.iterator(fbs.reader(), .{
+    var it: std.tar.Iterator = .init(&reader, .{
         .file_name_buffer = &file_name_buffer,
         .link_name_buffer = &link_name_buffer,
     });
@@ -776,7 +775,7 @@ fn unpackInner(tar_bytes: []u8) !void {
                         {
                             gop.value_ptr.* = file;
                         }
-                        const file_bytes = tar_bytes[fbs.pos..][0..@intCast(tar_file.size)];
+                        const file_bytes = tar_bytes[reader.seek..][0..@intCast(tar_file.size)];
                         assert(file == try Walk.add_file(file_name, file_bytes));
                     }
                 } else {

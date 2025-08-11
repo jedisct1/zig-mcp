@@ -144,13 +144,12 @@ fn mainImpl() !void {
     var parser = try Parser.init(gpa);
     defer parser.deinit();
 
-    var stdin_buf = std.io.bufferedReader(std.fs.File.stdin().deprecatedReader());
-    var line_buf = std.ArrayList(u8).init(gpa);
-    defer line_buf.deinit();
-    while (stdin_buf.reader().streamUntilDelimiter(line_buf.writer(), '\n', null)) {
-        if (line_buf.getLastOrNull() == '\r') _ = line_buf.pop();
-        try parser.feedLine(line_buf.items);
-        line_buf.clearRetainingCapacity();
+    var stdin_buffer: [1024]u8 = undefined;
+    var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
+
+    while (stdin_reader.takeDelimiterExclusive('\n')) |line| {
+        const trimmed = std.mem.trimRight(u8, line, '\r');
+        try parser.feedLine(trimmed);
     } else |err| switch (err) {
         error.EndOfStream => {},
         else => |e| return e,
@@ -159,9 +158,10 @@ fn mainImpl() !void {
     var doc = try parser.endInput();
     defer doc.deinit(gpa);
 
-    var stdout_buf = std.io.bufferedWriter(std.fs.File.stdout().deprecatedWriter());
-    try doc.render(stdout_buf.writer());
-    try stdout_buf.flush();
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    try doc.render(&stdout_writer.interface);
+    try stdout_writer.interface.flush();
 }
 
 test "empty document" {
