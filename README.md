@@ -12,114 +12,6 @@ It uses the same approach as Zig's official autodoc (ziglang.org) by reading STD
   <img src="https://raw.githubusercontent.com/zig-wasm/.github/refs/heads/main/static/readme_mcp_2.gif" width="49%" />
 </p>
 
-## Installation
-
-### Claude Code
-
-Using Node:
-
-```bash
-claude mcp add zig-docs npx -y zig-mcp@latest --version master --update-policy manual
-```
-
-Using Bun:
-
-```bash
-claude mcp add zig-docs bunx zig-mcp@latest --version master --update-policy manual
-```
-
-### Roo Code
-
-1. Click the **MCP** button in Roo Code
-2. Select **"Edit Global MCP"** or **"Edit Project MCP"**
-3. Add the following configuration:
-
-Using Node:
-
-```json
-{
-  "mcpServers": {
-    "zig-docs": {
-      "command": "npx",
-      "args": ["-y", "zig-mcp@latest", "--version", "master", "--update-policy", "manual"]
-    }
-  }
-}
-```
-
-Using Bun:
-
-```json
-{
-  "mcpServers": {
-    "zig-docs": {
-      "command": "bunx",
-      "args": ["zig-mcp@latest", "--version", "master", "--update-policy", "manual"]
-    }
-  }
-}
-```
-
-### Augment Code
-
-Navigate to **Settings → MCP Servers → Add Server**, or edit the configuration directly:
-
-Using Node:
-
-```json
-{
-  "mcpServers": {
-    "zig-docs": {
-      "command": "npx",
-      "args": ["-y", "zig-mcp@latest", "--version", "master", "--update-policy", "manual"]
-    }
-  }
-}
-```
-
-Using Bun:
-
-```json
-{
-  "mcpServers": {
-    "zig-docs": {
-      "command": "bunx",
-      "args": ["zig-mcp@latest", "--version", "master", "--update-policy", "manual"]
-    }
-  }
-}
-```
-
-### Claude Desktop
-
-Add to your MCP configuration:
-
-Using Node:
-
-```json
-{
-  "mcpServers": {
-    "zig-docs": {
-      "command": "npx",
-      "args": ["-y", "zig-mcp@latest", "--version", "master", "--update-policy", "manual"]
-    }
-  }
-}
-```
-
-Using Bun:
-
-```json
-{
-  "mcpServers": {
-    "zig-docs": {
-      "command": "bunx",
-      "args": ["zig-mcp@latest", "--version", "master", "--update-policy", "manual"]
-    }
-  }
-}
-```
-
 ## Tools
 
 - **`list_builtin_functions`** - Lists all available Zig builtin functions. Builtin functions are provided by the compiler and are prefixed with '@'. The comptime keyword on a parameter means that the parameter must be known at compile time. Use this to discover what functions are available, then use 'get_builtin_function' to get detailed documentation.
@@ -136,16 +28,16 @@ The CLI provides flexible options for version control and update management:
 zig-mcp
 
 # Use specific Zig version
-zig-mcp --version 0.13.0
+zig-mcp --version 0.14.1
 
 # Enable automatic daily updates
 zig-mcp --update-policy daily
 
 # Update documentation without starting server
-zig-mcp update --version 0.14.1
+zig-mcp update --version 0.15.1
 
 # Start local web server to view documentation
-zig-mcp view --version 0.14.1
+zig-mcp view --version 0.15.1
 ```
 
 **Version options**:
@@ -163,3 +55,55 @@ Documentation is fetched from ziglang.org and cached in platform-specific direct
 - Linux: `~/.cache/zig-mcp/`
 - macOS: `~/Library/Caches/zig-mcp/`
 - Windows: `%LOCALAPPDATA%\zig-mcp\`
+
+## Installation
+
+### Claude Code
+Using npx (Node.js)
+```bash
+claude mcp add zig-docs npx -y zig-mcp@latest --version master --update-policy manual
+```
+
+Using bunx (Bun)
+```bash
+claude mcp add zig-docs bunx zig-mcp@latest --version master --update-policy manual
+```
+
+### Roo Code
+
+1. Click the **MCP** button in Roo Code
+2. Select **"Edit Global MCP"** or **"Edit Project MCP"**
+3. Add the configuration from the JSON template below
+
+### Augment Code
+
+Navigate to **Settings → MCP Servers → Add Server** and use the JSON template below.
+
+### Claude Desktop
+
+Add the JSON configuration below to your MCP settings file.
+
+### JSON Configuration Template
+
+**Node.js:**
+```json
+{
+  "mcpServers": {
+    "zig-docs": {
+      "command": "npx",
+      "args": ["-y", "zig-mcp@latest", "--version", "master", "--update-policy", "manual"]
+    }
+  }
+}
+```
+
+**Bun:**
+```json
+{
+  "mcpServers": {
+    "zig-docs": {
+      "command": "bunx",
+      "args": ["zig-mcp@latest", "--version", "master", "--update-policy", "manual"]
+    }
+  }
+}
