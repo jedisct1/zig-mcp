@@ -2,25 +2,26 @@ const std = @import("std");
 const Document = @import("Document.zig");
 const Node = Document.Node;
 const assert = std.debug.assert;
+const Writer = std.Io.Writer;
 
 /// A Markdown document renderer.
 ///
 /// Each concrete `Renderer` type has a `renderDefault` function, with the
 /// intention that custom `renderFn` implementations can call `renderDefault`
 /// for node types for which they require no special rendering.
-pub fn Renderer(comptime Writer: type, comptime Context: type) type {
+pub fn Renderer(comptime Context: type) type {
     return struct {
         renderFn: *const fn (
             r: Self,
             doc: Document,
             node: Node.Index,
-            writer: Writer,
+            writer: *Writer,
         ) Writer.Error!void = renderDefault,
         context: Context,
 
         const Self = @This();
 
-        pub fn render(r: Self, doc: Document, writer: Writer) Writer.Error!void {
+        pub fn render(r: Self, doc: Document, writer: *Writer) Writer.Error!void {
             try r.renderFn(r, doc, .root, writer);
         }
 
@@ -28,7 +29,7 @@ pub fn Renderer(comptime Writer: type, comptime Context: type) type {
             r: Self,
             doc: Document,
             node: Node.Index,
-            writer: Writer,
+            writer: *Writer,
         ) Writer.Error!void {
             const data = doc.nodes.items(.data)[@intFromEnum(node)];
             switch (doc.nodes.items(.tag)[@intFromEnum(node)]) {
@@ -162,8 +163,8 @@ pub fn Renderer(comptime Writer: type, comptime Context: type) type {
 pub fn renderInlineNodeText(
     doc: Document,
     node: Node.Index,
-    writer: anytype,
-) @TypeOf(writer).Error!void {
+    writer: *Writer,
+) Writer.Error!void {
     const data = doc.nodes.items(.data)[@intFromEnum(node)];
     switch (doc.nodes.items(.tag)[@intFromEnum(node)]) {
         .root,
