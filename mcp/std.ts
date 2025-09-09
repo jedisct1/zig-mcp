@@ -148,27 +148,37 @@ function renderModule(pkg_index: any) {
 }
 
 function renderDecl(decl_index: any) {
-    const category = wasm_exports.categorize_decl(decl_index, 0);
-    switch (category) {
-        case CAT_namespace:
-        case CAT_container:
-            return renderNamespacePage(decl_index);
-        case CAT_global_variable:
-        case CAT_primitive:
-        case CAT_global_const:
-        case CAT_type:
-        case CAT_type_type:
-            return renderGlobal(decl_index);
-        case CAT_function:
-            return renderFunction(decl_index);
-        case CAT_type_function:
-            return renderTypeFunction(decl_index);
-        case CAT_error_set:
-            return renderErrorSetPage(decl_index);
-        case CAT_alias:
-            return renderDecl(wasm_exports.get_aliasee());
-        default:
-            throw new Error("unrecognized category " + category);
+    let current = decl_index;
+    const seen = new Set<number>();
+    while (true) {
+        const category = wasm_exports.categorize_decl(current, 0);
+        switch (category) {
+            case CAT_namespace:
+            case CAT_container:
+                return renderNamespacePage(current);
+            case CAT_global_variable:
+            case CAT_primitive:
+            case CAT_global_const:
+            case CAT_type:
+            case CAT_type_type:
+                return renderGlobal(current);
+            case CAT_function:
+                return renderFunction(current);
+            case CAT_type_function:
+                return renderTypeFunction(current);
+            case CAT_error_set:
+                return renderErrorSetPage(current);
+            case CAT_alias: {
+                if (seen.has(current)) return renderNotFound();
+                seen.add(current);
+                const aliasee = wasm_exports.get_aliasee();
+                if (aliasee === -1) return renderNotFound();
+                current = aliasee;
+                continue;
+            }
+            default:
+                throw new Error("unrecognized category " + category);
+        }
     }
 }
 
@@ -406,6 +416,7 @@ function renderNamespaceMarkdown(base_decl: any, members: any, fields: any) {
     for (let i = 0; i < members.length; i++) {
         let member = members[i];
         const original = member;
+        const seen = new Set<number>();
         while (true) {
             const member_category = wasm_exports.categorize_decl(member, 0);
             switch (member_category) {
@@ -433,9 +444,15 @@ function renderNamespaceMarkdown(base_decl: any, members: any, fields: any) {
                 case CAT_primitive:
                     valsList.push({ original: original, member: member });
                     break;
-                case CAT_alias:
+                case CAT_alias: {
+                    if (seen.has(member)) {
+                        valsList.push({ original: original, member: member });
+                        break;
+                    }
+                    seen.add(member);
                     member = wasm_exports.get_aliasee();
                     continue;
+                }
                 default:
                     throw new Error("unknown category: " + member_category);
             }
@@ -879,11 +896,21 @@ export async function getStdLibItem(
     }
 
     if (getSourceFile) {
-        // Get the source file using decl_source_html for the file root
-        // We need to find the file that contains this declaration
-        const fqn = fullyQualifiedName(decl_index);
-        const filePath = getFilePathFromFqn(fqn);
-        if (filePath) {
+        // Resolve aliases by decl index
+        let cur = decl_index;
+        const seen = new Set<number>();
+        while (true) {
+            const cat = exports.categorize_decl(cur, 0);
+            if (cat !== CAT_alias) break;
+            if (seen.has(cur)) break; // cycle guard
+            seen.add(cur);
+            const next = exports.get_aliasee();
+            if (next === -1 || next === cur) break;
+            cur = next;
+        }
+
+        const filePath = unwrapString(wasm_exports.decl_file_path(cur));
+        if (filePath && filePath.length > 0) {
             const fileDecl = findFileRoot(filePath);
             if (fileDecl !== null) {
                 let markdown = "";
@@ -895,45 +922,5 @@ export async function getStdLibItem(
         return `# Error\n\nCould not find source file for "${name}".`;
     }
 
-    const category = exports.categorize_decl(decl_index, 0);
-    switch (category) {
-        case CAT_namespace:
-        case CAT_container:
-            return renderNamespacePage(decl_index);
-        case CAT_global_variable:
-        case CAT_primitive:
-        case CAT_global_const:
-        case CAT_type:
-        case CAT_type_type:
-            return renderGlobal(decl_index);
-        case CAT_function:
-            return renderFunction(decl_index);
-        case CAT_type_function:
-            return renderTypeFunction(decl_index);
-        case CAT_error_set:
-            return renderErrorSetPage(decl_index);
-        case CAT_alias:
-            return getStdLibItem(
-                wasmPath,
-                stdSources,
-                fullyQualifiedName(exports.get_aliasee()),
-                getSourceFile,
-            );
-        default:
-            return `# Error\n\nUnrecognized category ${category} for "${name}".`;
-    }
-}
-
-function getFilePathFromFqn(fqn: string): string | null {
-    // Convert fully qualified name to file path
-    const parts = fqn.split(".");
-    if (parts.length < 2) return null;
-
-    if (parts[0] === "std" && parts.length >= 2) {
-        return parts[0] + "/" + parts[1] + ".zig";
-    }
-
-    const pathParts = parts.slice(0, -1);
-    const filePath = pathParts.join("/") + ".zig";
-    return filePath;
+    return renderDecl(decl_index);
 }
